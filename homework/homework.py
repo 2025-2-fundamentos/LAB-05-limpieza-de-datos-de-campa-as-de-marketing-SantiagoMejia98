@@ -3,7 +3,10 @@ Escriba el codigo que ejecute la accion solicitada.
 """
 
 # pylint: disable=import-outside-toplevel
-
+import pandas as pd
+import os
+import zipfile
+import glob
 
 def clean_campaign_data():
     """
@@ -49,8 +52,52 @@ def clean_campaign_data():
 
 
     """
+    ruta_zip = "files/input"
+    ruta_final = 'files/output'
+    completo = pd.DataFrame()
+    client = pd.DataFrame()
+    campaign = pd.DataFrame()
+    economics = pd.DataFrame()
+    
+    zip_files = glob.glob(f"{ruta_zip}/*")
 
-    return
+
+    for zip in zip_files:
+        with zipfile.ZipFile(zip, 'r') as z:
+            with z.open(z.namelist()[0]) as file:
+                df = pd.read_csv(file)
+                completo = pd.concat([completo, df], ignore_index=True)
+
+    client["client_id"] = completo["client_id"].copy()
+    client["age"] = completo["age"].copy()
+    client["job"] = completo["job"].copy().str.replace(".", "", regex=False).str.replace("-", "_", regex=False)
+    client["marital"] = completo["marital"].copy()
+    client["education"] = completo["education"].copy().str.replace(".", "_", regex=False).replace("unknown", pd.NA)
+    client["credit_default"] = completo["credit_default"].copy().apply(lambda x: 1 if x == "yes" else 0)
+    client["mortgage"] = completo["mortgage"].copy().apply(lambda x: 1 if x == "yes" else 0)
+
+    campaign["client_id"] = completo["client_id"].copy()
+    campaign["number_contacts"] = completo["number_contacts"].copy()
+    campaign["contact_duration"] = completo["contact_duration"].copy()
+    campaign["previous_campaign_contacts"] = completo["previous_campaign_contacts"].copy()
+    campaign["previous_outcome"] = completo["previous_outcome"].copy().apply(lambda x: 1 if x == "success" else 0)
+    campaign["campaign_outcome"] = completo["campaign_outcome"].copy().apply(lambda x: 1 if x == "yes" else 0)
+    campaign["last_contact_date"] = pd.to_datetime(completo["day"].astype(str) + "-" + completo["month"]  + "-2022", format="%d-%b-%Y").dt.strftime("%Y-%m-%d")
+
+    economics["client_id"] = completo["client_id"].copy()
+    economics["cons_price_idx"] = completo["cons_price_idx"].copy()
+    economics["euribor_three_months"] = completo["euribor_three_months"].copy()
+
+    if os.path.exists(ruta_final):
+        for file in glob.glob(f"{ruta_final}/*"):
+            os.remove(file)
+        os.rmdir(ruta_final)
+    os.makedirs(ruta_final)
+
+    client.to_csv(os.path.join(ruta_final, "client.csv"), index=False)
+    campaign.to_csv(os.path.join(ruta_final, "campaign.csv"), index=False)
+    economics.to_csv(os.path.join(ruta_final, "economics.csv"), index=False)
+    return    
 
 
 if __name__ == "__main__":
